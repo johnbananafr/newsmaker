@@ -54,6 +54,12 @@ input[type=range]{accent-color:#e11b2b}
 <main>
 <section class="preview-panel">
   <div class="panel-head"><strong>LIVE PREVIEW</strong><span class="pill">1920 × 1080 · 16:9</span></div>
+  <div class="stage-wrap">
+    <div class="stage">
+      <canvas id="canvas" width="1920" height="1080"></canvas>
+      <div class="stage-empty" id="empty"><b>Your footage goes here</b><span>Upload a video to build your news graphic</span></div>
+    </div>
+  </div>
   <div class="transport">
     <button id="playBtn" type="button">Play</button>
     <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Video position">
