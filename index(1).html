@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Breaking News Generator</title>
+<style>
+:root{color-scheme:dark;--bg:#101114;--panel:#191b20;--line:#30333b;--muted:#a4a8b2;--red:#b50918;--red2:#d20b1e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#f5f5f6;font:14px/1.45 Inter,Segoe UI,Arial,sans-serif}
+header{height:64px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#15161a}
+.brand{font-weight:750;letter-spacing:.02em;font-size:16px}.brand span{color:#ff5966}
+header small{color:var(--muted);font-size:12px}
+main{max-width:1440px;margin:auto;padding:24px;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.85fr);gap:22px}
+.preview-panel,.editor{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.panel-head{padding:14px 17px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.panel-head strong{font-size:13px;letter-spacing:.04em}
+.pill{font-size:11px;color:#d6d7dc;border:1px solid #41444d;border-radius:20px;padding:4px 9px}
+.stage-wrap{padding:18px;background:#0b0c0f}
+.stage{width:100%;aspect-ratio:16/9;background:#08090b;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+.stage-empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;color:#aeb2bc;gap:8px;pointer-events:none}
+.stage-empty b{color:#f1f1f3;font-size:16px}.stage-empty span{font-size:12px}
+.transport{display:flex;align-items:center;gap:12px;padding:12px 17px;border-top:1px solid var(--line)}
+.transport button{background:#292c33;border:1px solid #41444d;color:#fff;border-radius:7px;padding:7px 11px;cursor:pointer}
+.transport input[type=range]{flex:1;accent-color:#e11b2b}
+#time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;min-width:86px;text-align:right}
+.editor{padding-bottom:16px}
+.section{padding:15px 17px;border-bottom:1px solid var(--line)}
+.section:last-child{border-bottom:0}
+h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#d7d8dc;margin:0 0 12px}
+.field{display:block;margin:0 0 12px}.field:last-child{margin-bottom:0}
+.field>span{display:block;font-size:12px;color:#b9bdc6;margin-bottom:5px}
+input[type=text],textarea,select{width:100%;background:#101216;color:#f7f7f8;border:1px solid #3a3d46;border-radius:7px;padding:9px 10px;font:inherit;outline:none}
+input[type=text]:focus,textarea:focus,select:focus{border-color:#e34b57}
+textarea{resize:vertical;min-height:62px}
+input[type=file]{width:100%;font-size:12px;color:var(--muted)}
+input[type=range]{accent-color:#e11b2b}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.checkrow{display:flex;align-items:center;gap:8px;color:#c6c9d0;font-size:12px;margin-top:10px}
+.checkrow input{accent-color:#d20b1e}
+.actions{display:flex;gap:9px;padding:15px 17px 0}
+.primary,.secondary{border:0;border-radius:8px;padding:11px 14px;font-weight:700;cursor:pointer}
+.primary{background:#d20b1e;color:white;flex:1}.primary:hover{background:#eb1c30}
+.secondary{background:#30333b;color:#f4f4f5}
+.primary:disabled{opacity:.45;cursor:not-allowed}
+.note{padding:10px 17px 0;color:#969ba6;font-size:11px}
+#status{padding:8px 17px 0;color:#e0b7bb;font-size:11px;min-height:22px}
+@media(max-width:900px){main{grid-template-columns:1fr;padding:12px}.editor{order:2}header{padding:0 14px}.stage-wrap{padding:10px}}
+</style>
+</head>
+<body>
+<header><div class="brand">BREAKING NEWS <span>GENERATOR</span></div><small>Custom broadcast graphics · 16:9 composition</small></header>
+<main>
+<section class="preview-panel">
+  <div class="panel-head"><strong>LIVE PREVIEW</strong><span class="pill">1920 × 1080 · 16:9</span></div>
+  <div class="stage-wrap">
+    <div class="stage">
+      <canvas id="canvas" width="1920" height="1080"></canvas>
+      <div class="stage-empty" id="empty"><b>Your footage goes here</b><span>Upload a video to build your news graphic</span></div>
+    </div>
+  </div>
+  <div class="transport">
+    <button id="playBtn" type="button">Play</button>
+    <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Video position">
+    <span id="time">00:00 / 00:00</span>
+  </div>
+</section>
+<aside class="editor">
+  <div class="panel-head"><strong>COMPOSITION SETTINGS</strong><span class="pill">EDITOR</span></div>
+  <div class="section">
+    <h2>01 / Background footage</h2>
+    <label class="field"><span>Upload video</span><input id="file" type="file" accept="video/mp4,video/webm,video/quicktime"></label>
+    <div class="grid2">
+      <label class="field"><span>Video framing</span><select id="fit"><option value="cover">Fill frame (crop)</option><option value="contain">Fit entire video</option></select></label>
+      <label class="field"><span>Video brightness</span><input id="brightness" type="range" min="40" max="130" value="100"></label>
+    </div>
+    <label class="field"><span>Horizontal position</span><input id="posX" type="range" min="0" max="100" value="50"></label>
+    <label class="field"><span>Vertical position</span><input id="posY" type="range" min="0" max="100" value="50"></label>
+  </div>
+  <div class="section">
+    <h2>02 / News banner</h2>
+    <label class="field"><span>Channel branding</span><input id="channel" type="text" maxlength="42" value="WORLD NEWS"></label>
+    <label class="field"><span>Main headline</span><textarea id="headline" maxlength="150">A major story is developing</textarea></label>
+    <label class="field"><span>Subtitle</span><input id="subtitle" type="text" maxlength="150" value="More details are expected shortly"></label>
+    <label class="field"><span>Banner label</span><input type="text" value="BREAKING" disabled></label>
+  </div>
+  <div class="section">
+    <h2>03 / Bottom ticker</h2>
+    <label class="field"><span>Ticker text</span><input id="ticker" type="text" maxlength="90" value="HEADLINES"></label>
+    <label class="checkrow"><input id="showTicker" type="checkbox" checked> Show bottom ticker strip</label>
+  </div>
+  <div class="section">
+    <h2>04 / Export</h2>
+    <div class="grid2">
+      <label class="field"><span>Output size</span><select id="resolution"><option value="1920">1080p · Full HD</option><option value="1280">720p · HD</option></select></label>
+      <label class="field"><span>Frame rate</span><select id="fps"><option value="30">30 fps</option><option value="25">25 fps</option><option value="24">24 fps</option></select></label>
+    </div>
+    <div class="actions" style="padding:0">
+      <button class="primary" id="exportBtn" disabled>Export video</button>
+      <button class="secondary" id="resetBtn" type="button">Reset</button>
+    </div>
+    <div id="status">Upload footage to enable export. The original audio of your video is kept in the export.</div>
+    <div class="note">The browser's recording support determines the output format. Most browsers export WebM; MP4 is offered only when natively supported. No audio is added: only your video's own sound is recorded.</div>
+  </div>
+</aside>
+</main>
+<!-- Not muted: preview must have sound. Hidden because the canvas draws it. -->
+<video id="video" playsinline preload="auto" style="display:none"></video>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas'), ctx = canvas.getContext('2d', {alpha:false});
+  const video = $('video');
+  const inputs = ['fit','brightness','posX','posY','channel','headline','subtitle','ticker','showTicker'];
+  let objectUrl = null, raf = 0, recording = false;
+
+  // Web Audio fallback graph (created lazily, once per <video> element).
+  let audioCtx = null, audioDest = null;
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /* ---------- text helpers ---------- */
+  function wrapLines(text, maxW, font) {
+    ctx.font = font;
+    const words = text.trim().split(/\s+/).filter(Boolean), lines = [];
+    let line = '';
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w;
+      if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+      else line = t;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function ellipsize(text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && ctx.measureText(t + '\u2026').width > maxW) t = t.slice(0, -1);
+    return t.trimEnd() + '\u2026';
+  }
+
+  /* ---------- drawing ---------- */
+  function draw() {
+    const W = canvas.width, H = canvas.height;
+    const s = W / 1920; // all lower-third measurements are designed at 1920 wide and scaled
+    ctx.fillStyle = '#20242a'; ctx.fillRect(0, 0, W, H);
+    if (video.readyState >= 2 && video.videoWidth) {
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const fit = $('fit').value;
+      const scale = fit === 'cover' ? Math.max(W / vw, H / vh) : Math.min(W / vw, H / vh);
+      const dw = vw * scale, dh = vh * scale;
+      const x = (W - dw) * ($('posX').value / 100), y = (H - dh) * ($('posY').value / 100);
+      ctx.save(); ctx.filter = `brightness(${$('brightness').value}%)`;
+      ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(video, x, y, dw, dh); ctx.restore();
+    } else {
+      ctx.fillStyle = '#343941'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#aeb4bf'; ctx.font = `600 ${Math.round(34 * s)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('UPLOAD VIDEO TO PREVIEW', W / 2, H / 2);
+    }
+
+    // Lower third: custom branding, not an official network logo.
+    const tickerOn = $('showTicker').checked;
+    const tickerH = tickerOn ? Math.round(78 * s) : 0;
+    const bannerH = Math.round(H * 0.21);          // red banner = bottom ~21% of the frame
+    const bannerY = H - tickerH - bannerH;         // ticker strip sits beneath it
+    ctx.fillStyle = '#b50918'; ctx.fillRect(0, bannerY, W, bannerH);
+
+    const pad = Math.round(286 * s);
+    const maxW = W - pad - Math.round(100 * s);
+    ctx.textAlign = 'left';
+
+    // ROW 1: channel branding + white BREAKING label (vertically centred on one line)
+    const r1y = bannerY + Math.round(36 * s);
+    ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+    ctx.font = `700 ${Math.round(34 * s)}px Arial, sans-serif`;
+    const channel = ($('channel').value || 'WORLD NEWS').toUpperCase();
+    ctx.fillText(channel, pad, r1y);
+    const labelW = Math.round(176 * s), labelH = Math.round(40 * s);
+    const labelX = pad + ctx.measureText(channel).width + Math.round(24 * s), labelY = r1y - labelH / 2;
+    ctx.fillStyle = '#fff'; ctx.fillRect(labelX, labelY, labelW, labelH);
+    ctx.fillStyle = '#a50917'; ctx.font = `700 ${Math.round(28 * s)}px Arial, sans-serif`;
+    const bw = ctx.measureText('BREAKING').width;
+    ctx.fillText('BREAKING', labelX + (labelW - bw) / 2, r1y + 1);
+
+    // ROW 2: headline, large serif. Shrinks (60 -> 34 px) so it fits in at most 2 lines
+    // within a fixed-height block; if still too long, the 2nd line is cut with an ellipsis.
+    const serif = px => `bold ${px}px Georgia, "Times New Roman", serif`;
+    const headTop = bannerY + Math.round(68 * s);
+    const maxHeadH = 104 * s;
+    const headline = $('headline').value || '';
+    let size = 60, lines = [];
+    for (; size >= 34; size -= 2) {
+      lines = wrapLines(headline, maxW, serif(Math.round(size * s)));
+      if (lines.length <= 2 && lines.length * size * 1.1 * s <= maxHeadH) break;
+    }
+    if (size < 34) {
+      size = 34;
+      lines = wrapLines(headline, maxW, serif(Math.round(size * s)));
+      if (lines.length > 2) { lines = lines.slice(0, 2); ctx.font = serif(Math.round(size * s)); lines[1] = ellipsize(lines[1] + ' \u2026', maxW); }
+    }
+    const headPx = Math.round(size * s), lineH = size * 1.1 * s;
+    ctx.font = serif(headPx); ctx.textBaseline = 'top'; ctx.fillStyle = '#fff';
+    lines.forEach((ln, i) => ctx.fillText(ellipsize(ln, maxW), pad, headTop + i * lineH));
+
+    // ROW 3: subtitle, own row directly beneath the headline, clearly smaller (30 px max).
+    let subPx = Math.round(30 * s);
+    const sub = $('subtitle').value || '';
+    ctx.font = `${subPx}px Arial, sans-serif`;
+    while (subPx > 22 * s && ctx.measureText(sub).width > maxW) { subPx -= 1; ctx.font = `${subPx}px Arial, sans-serif`; }
+    const subY = headTop + Math.max(lines.length, 1) * lineH + 10 * s;
+    ctx.textBaseline = 'top'; ctx.fillStyle = '#fff';
+    ctx.fillText(ellipsize(sub, maxW), pad, subY);
+
+    // Separate light strip beneath the banner
+    if (tickerOn) {
+      const ty = H - tickerH;
+      ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0, ty, W, tickerH);
+      const sq = Math.round(14 * s);
+      ctx.fillStyle = '#b50918'; ctx.fillRect(pad, ty + (tickerH - sq) / 2, sq, sq);
+      ctx.fillStyle = '#42464d'; ctx.font = `700 ${Math.round(34 * s)}px Arial, sans-serif`; ctx.textBaseline = 'middle';
+      ctx.fillText(ellipsize(($('ticker').value || '').toUpperCase(), maxW - 25 * s), pad + Math.round(25 * s), ty + tickerH / 2 + 1);
+    }
+  }
+  function loop() { draw(); raf = requestAnimationFrame(loop); }
+  function fmt(t) { if (!isFinite(t)) t = 0; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`; }
+  function updateTime() {
+    const d = video.duration || 0, t = video.currentTime || 0;
+    $('time').textContent = `${fmt(t)} / ${fmt(d)}`;
+    $('seek').value = d ? Math.round(t / d * 1000) : 0;
+  }
+  function setStatus(s) { $('status').textContent = s; }
+
+  /* ---------- file / transport ---------- */
+  $('file').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(file); video.src = objectUrl; video.load();
+    $('empty').style.display = 'none'; $('exportBtn').disabled = true;
+    setStatus('Loading video…');
+  });
+  video.addEventListener('loadedmetadata', () => {
+    $('exportBtn').disabled = false; updateTime(); draw();
+    setStatus(`Loaded: ${video.videoWidth} × ${video.videoHeight} · ${fmt(video.duration)}. Preview is ready.`);
+  });
+  video.addEventListener('error', () => setStatus('This video could not be opened by your browser. Try MP4 (H.264) or WebM.'));
+  $('playBtn').onclick = async () => {
+    if (audioCtx && audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
+    if (video.paused) { try { await video.play(); $('playBtn').textContent = 'Pause'; } catch (e) { setStatus('Playback could not start. Try pressing Play again.'); } }
+    else { video.pause(); $('playBtn').textContent = 'Play'; }
+  };
+  video.addEventListener('pause', () => $('playBtn').textContent = 'Play');
+  video.addEventListener('play', () => $('playBtn').textContent = 'Pause');
+  video.addEventListener('timeupdate', updateTime);
+  $('seek').addEventListener('input', () => { if (video.duration) video.currentTime = video.duration * ($('seek').value / 1000); });
+  inputs.forEach(id => $(id).addEventListener('input', draw));
+  $('resetBtn').onclick = () => {
+    $('fit').value = 'cover'; $('brightness').value = 100; $('posX').value = 50; $('posY').value = 50;
+    $('channel').value = 'WORLD NEWS'; $('headline').value = 'A major story is developing';
+    $('subtitle').value = 'More details are expected shortly'; $('ticker').value = 'HEADLINES'; $('showTicker').checked = true; draw();
+  };
+
+  /* ---------- audio capture ---------- */
+  // 1) Native: video.captureStream() (mozCaptureStream on Firefox) -> its audio tracks.
+  async function nativeAudioTracks() {
+    const cap = video.captureStream || video.mozCaptureStream;
+    if (!cap) return [];
+    let st;
+    try { st = cap.call(video); } catch (e) { return []; }
+    for (let i = 0; i < 8 && !st.getAudioTracks().length; i++) await sleep(100); // tracks can appear a moment late
+    return st.getAudioTracks().filter(t => t.readyState === 'live');
+  }
+  // 2) Fallback: Web Audio. The element is routed to a MediaStreamDestination (for recording)
+  //    and to the speakers (so preview keeps its sound). Created once per element.
+  function webAudioTracks() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return [];
+    try {
+      if (!audioCtx) {
+        audioCtx = new AC();
+        const src = audioCtx.createMediaElementSource(video);
+        audioDest = audioCtx.createMediaStreamDestination();
+        src.connect(audioDest);
+        src.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioDest.stream.getAudioTracks();
+    } catch (e) { return []; }
+  }
+
+  function pickMime(withAudio) {
+    const types = withAudio ? [
+      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus',
+      'video/mp4', 'video/webm'
+    ] : [
+      'video/mp4;codecs="avc1.42E01E"', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'
+    ];
+    return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  }
+  function seekTo(t) {
+    return new Promise(res => {
+      const done = () => { video.removeEventListener('seeked', done); res(); };
+      video.addEventListener('seeked', done); video.currentTime = t; setTimeout(done, 1500);
+    });
+  }
+
+  /* ---------- export ---------- */
+  $('exportBtn').onclick = async () => {
+    if (!video.src || recording) return;
+    if (!canvas.captureStream || !window.MediaRecorder) { setStatus('This browser does not support in-browser video export. Try a recent version of Chrome or Edge.'); return; }
+    recording = true; $('exportBtn').disabled = true; setStatus('Preparing export…');
+
+    const width = Number($('resolution').value), height = Math.round(width * 9 / 16), fps = Number($('fps').value);
+    const oldW = canvas.width, oldH = canvas.height;
+    let canvasStream = null, recorder = null;
+    const restore = msg => {
+      if (canvasStream) canvasStream.getTracks().forEach(t => t.stop()); // canvas tracks only; never the source audio
+      canvas.width = oldW; canvas.height = oldH; recording = false;
+      $('exportBtn').disabled = false; $('exportBtn').textContent = 'Export video'; draw();
+      if (msg) setStatus(msg);
+    };
+
+    try {
+      // Audio first, while the video is idle at its current position.
+      let audioTracks = await nativeAudioTracks();
+      let audioVia = 'video.captureStream()';
+      if (!audioTracks.length) { audioTracks = webAudioTracks(); audioVia = 'Web Audio'; }
+      const hasAudio = audioTracks.length > 0;
+
+      canvas.width = width; canvas.height = height; draw();
+      canvasStream = canvas.captureStream(fps);
+
+      // One combined stream: canvas video track + original audio track(s).
+      const combined = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+      const nV = combined.getVideoTracks().length, nA = combined.getAudioTracks().length;
+
+      let mime = pickMime(hasAudio);
+      if (!mime) { restore('No supported recording format was found in this browser.'); return; }
+      const bps = width === 1920 ? 9000000 : 5000000;
+      try { recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: bps, audioBitsPerSecond: 128000 }); }
+      catch (e) {
+        try { mime = pickMime(false); recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: bps }); }
+        catch (e2) { restore('Could not start the browser recorder.'); return; }
+      }
+
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onerror = () => restore('Recording failed. Please try again.');
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mime }), ext = mime.includes('mp4') ? 'mp4' : 'webm';
+        const url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.href = url; a.download = `breaking-news-${width}p.${ext}`; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        restore(`Export complete: ${ext.toUpperCase()} · ${width} × ${height} · ${nV} video + ${nA} audio track${nA === 1 ? '' : 's'}${nA ? ' (original sound included)' : ' (no sound)'}.`);
+      };
+
+      if (hasAudio) setStatus(`Recording ${width}p ${fps} fps with original audio (${nV} video + ${nA} audio track via ${audioVia}). Keep this tab open until the export finishes.`);
+      else setStatus(`Recording ${width}p ${fps} fps WITHOUT sound: no audio track could be captured (the file may have no audio, or this browser cannot capture it). Keep this tab open until the export finishes.`);
+
+      // Record from the current position to the end.
+      if (video.ended) await seekTo(0);
+      const finish = () => {
+        video.removeEventListener('ended', finish);
+        setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 300); // let the last frames/audio flush
+      };
+      video.addEventListener('ended', finish);
+      recorder.start(250);
+      if (video.paused) {
+        try { await video.play(); }
+        catch (e) { video.removeEventListener('ended', finish); if (recorder.state === 'recording') recorder.stop(); return; }
+      }
+    } catch (err) {
+      restore('Export failed: ' + (err && err.message ? err.message : 'unknown error'));
+      return;
+    }
+    $('exportBtn').textContent = 'Recording…';
+  };
+  loop();
+  window.addEventListener('beforeunload', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); });
+})();
+</script>
+</body>
+</html>
